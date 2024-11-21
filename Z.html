@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV File Upload</title>
+    <style>
+        #warning { display: none; color: red; }
+        #loading { display: none; }
+        #download-link { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Upload CSV File for Processing</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" id="file-input" name="file" accept=".csv" required>
+        <button type="submit" id="upload-button">Upload</button>
+    </form>
+
+    <div id="warning">Please wait before uploading another file.</div>
+    <div id="loading">
+        <p>Processing...</p>
+    </div>
+
+    <div id="cmd-log"></div>
+
+    <div id="download-link">
+        <p>Processing complete! You can download the processed file <a id="download-href" href="#">here</a>.</p>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const uploadButton = document.getElementById('upload-button');
+        const loadingDiv = document.getElementById('loading');
+        const cmdLog = document.getElementById('cmd-log');
+        const downloadLinkDiv = document.getElementById('download-link');
+        const downloadHref = document.getElementById('download-href');
+
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (uploadButton.disabled) {
+                document.getElementById('warning').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('warning').style.display = 'none';
+            uploadButton.disabled = true;
+            loadingDiv.style.display = 'flex';
+            cmdLog.innerHTML = "<p>Processing your request...</p>";
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Sending the file to the Flask API
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                cmdLog.innerHTML += result.logs.join('<br>');
+
+                if (response.ok) {
+                    // Show the download link when processing is successful
+                    const downloadLink = result.download_url;
+                    downloadLinkDiv.style.display = 'block';
+                    downloadHref.href = downloadLink;
+                    downloadHref.download = `Processed_${file.name}`;
+                } else {
+                    cmdLog.innerHTML += "<p style='color: red;'>Error: Process failed.</p>";
+                }
+            } catch (error) {
+                cmdLog.innerHTML += `<p style='color: red;'>Error: ${error.message}</p>`;
+            } finally {
+                uploadButton.disabled = false;
+                loadingDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
