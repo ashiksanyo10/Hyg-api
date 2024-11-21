@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Scraper</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #ecf0f3;
+            margin: 0;
+            position: relative;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #ecf0f3;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .header img {
+            width: 60px; /* Increased logo size */
+            height: auto;
+        }
+
+        .menu {
+            position: relative;
+            display: inline-block;
+            right: 35px;
+        }
+
+        .menu a {
+            display: inline-block;
+            text-decoration: none;
+            color: #1399FF; /* Color for the Menu text */
+            font-weight: 500;
+            font-size: 18px; /* Adjust font size as needed */
+            cursor: pointer;
+            padding: 10px;
+        }
+
+        .menu a:hover {
+            color: #007BFF; /* Slightly darker color on hover */
+        }
+
+        .nav-menu {
+            display: none;
+            position: absolute;
+            top: 40px; /* Adjust this to position the menu correctly */
+            right: 0;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 1001;
+            width: 200px; /* Ensure enough width for content */
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .nav-menu.show {
+            display: block;
+            opacity: 1;
+        }
+
+        .nav-menu a {
+            display: block;
+            padding: 12px 15px;
+            text-decoration: none;
+            color: #007BFF;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+            color: #0056b3;
+        }
+
+        #uploadForm,
+        #inputForm {
+            background-color: #ecf0f3;
+            box-shadow: 9px 9px 16px #babecc, -9px -9px 16px #fff;
+            border-radius: 10px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #uploadForm input[type="file"] {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            box-shadow: inset 5px 5px 10px #babecc, inset -5px -5px 10px #fff;
+        }
+
+        #uploadForm button,
+        #inputForm button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            box-shadow: 5px 5px 10px #babecc, -5px -5px 10px #fff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+
+        #uploadForm button:hover,
+        #inputForm button:hover {
+            background-color: #0056b3;
+        }
+
+        #uploadForm button:disabled,
+        #inputForm button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #loading {
+            display: none;
+            margin-top: 20px;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007BFF;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #downloadLink {
+            margin-top: 20px;
+            display: none;
+            background-color: #ecf0f3;
+            box-shadow: 5px 5px 10px #babecc, -5px -5px 10px #fff;
+            border-radius: 10px;
+            padding: 10px 20px;
+        }
+
+        #downloadLink a {
+            text-decoration: none;
+            color: #007BFF;
+            font-weight: 500;
+        }
+
+        #warning {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+
+        #cmdLog {
+            width: 90%;
+            max-width: 700px;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: scroll;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+            }
+
+            .menu a {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+
+            .nav-menu {
+                right: 10px;
+                top: 60px; /* Adjusted position for mobile view */
+                width: 100%; /* Make dropdown full width on small screens */
+            }
+
+            .nav-menu a {
+                padding: 15px; /* Increased padding for mobile view */
+                text-align: center; /* Center text for better alignment on mobile */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Amazon_Prime_Logo.svg/120px-Amazon_Prime_Logo.svg.png" alt="Logo">
+        <div class="menu">
+            <a href="#" id="menuText">Menu</a>
+            <div class="nav-menu" id="navMenu">
+                <a href="#">NZ-SOP</a>
+                <a href="https://www.classificationoffice.govt.nz/" target="_blank">Official website 1</a>
+                <a href="https://www.fvlb.org.nz/" target="_blank">Official website 2</a>
+                <a href="#">How to use</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel file upload form -->
+    <form id="uploadForm" enctype="multipart/form-data">
+        <label for="file">Upload Excel file:</label>
+        <input type="file" id="file" name="file" accept=".xlsx" required>
+        <button type="submit">Upload and Process</button>
+    </form>
+
+    <div id="loading">
+        <div class="loader"></div>
+        <p>Fetching details for you...</p>
+    </div>
+    <div id="warning">Already under process - please wait!</div>
+    <div id="downloadLink">
+        <a href="#" id="downloadHref">Download Scraped Data</a>
+    </div>
+
+    <!-- Command log display section -->
+    <div id="cmdLog">
+        <p>Command log will appear here...</p>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('file');
+        const uploadButton = uploadForm.querySelector('button');
+        const loadingDiv = document.getElementById('loading');
+        const downloadLinkDiv = document.getElementById('downloadLink');
+        const downloadHref = document.getElementById('downloadHref');
+        const cmdLog = document.getElementById('cmdLog'); // Command log element
+
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            if (uploadButton.disabled) {
+                document.getElementById('warning').style.display = 'block';
+                return;
+            }
+            document.getElementById('warning').style.display = 'none';
+            uploadButton.disabled = true;
+            loadingDiv.style.display = 'flex';
+            cmdLog.innerHTML = "<p>Processing your request...</p>"; // Initial log message
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Example log
+                cmdLog.innerHTML += "<p>Sending request to server...</p>";
+
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // More log after the request is sent
+                cmdLog.innerHTML += "<p>Processing completed. Download ready.</p>";
+
+                const result = await response.json();
+                if (result.success) {
+                    const fileUrl = result.fileUrl;
+                    downloadLinkDiv.style.display = 'block';
+                    downloadHref.href = fileUrl;
+                    downloadHref.download = 'scraped_data.xlsx';
+                }
+            } catch (error) {
+                cmdLog.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            } finally {
+                uploadButton.disabled = false;
+                loadingDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
