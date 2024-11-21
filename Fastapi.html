@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Hygiene Checker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 20px;
+    }
+    #loading {
+      display: none;
+      margin-top: 20px;
+    }
+    #warning {
+      display: none;
+      color: red;
+      margin-top: 10px;
+    }
+    #downloadLink {
+      display: none;
+      margin-top: 20px;
+    }
+    #cmdLog {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>CSV Hygiene Checker</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <label for="file">Upload CSV file:</label>
+    <input type="file" id="file" name="file" accept=".csv" required>
+    <button type="submit">Upload and Process</button>
+  </form>
+
+  <div id="loading">
+    <p>Processing your file...</p>
+  </div>
+  <div id="warning">Processing is already in progress. Please wait!</div>
+  <div id="downloadLink">
+    <a href="#" id="downloadHref">Download Processed File</a>
+  </div>
+
+  <div id="cmdLog">
+    <p>Command log will appear here...</p>
+  </div>
+
+  <script>
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('file');
+    const uploadButton = uploadForm.querySelector('button');
+    const loadingDiv = document.getElementById('loading');
+    const downloadLinkDiv = document.getElementById('downloadLink');
+    const downloadHref = document.getElementById('downloadHref');
+    const cmdLog = document.getElementById('cmdLog');
+
+    uploadForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (uploadButton.disabled) {
+        document.getElementById('warning').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('warning').style.display = 'none';
+      uploadButton.disabled = true;
+      loadingDiv.style.display = 'block';
+      cmdLog.innerHTML = "<p>Processing your file...</p>";
+
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/process', {
+          method: 'POST',
+          body: formData
+        });
+
+        const responseJson = await response.json();
+
+        if (response.ok) {
+          const logs = responseJson.logs;
+          logs.forEach(log => {
+            cmdLog.innerHTML += `<p>${log}</p>`;
+          });
+
+          const fileUrl = responseJson.download_url;
+          downloadLinkDiv.style.display = 'block';
+          downloadHref.href = `http://127.0.0.1:8000${fileUrl}`;
+          downloadHref.download = `Processed_${file.name}`;
+        } else {
+          cmdLog.innerHTML += `<p style='color: red;'>Error: ${responseJson.detail}</p>`;
+        }
+      } catch (error) {
+        cmdLog.innerHTML += `<p style='color: red;'>Error: ${error.message}</p>`;
+      } finally {
+        uploadButton.disabled = false;
+        loadingDiv.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
