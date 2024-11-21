@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload and Log Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload CSV and View Logs</h1>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" name="file" id="file" accept=".csv" required>
+            <button type="submit">Upload</button>
+        </form>
+        
+        <div class="log-window">
+            <h2>Logs</h2>
+            <pre id="log-output"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Handling file upload and displaying logs in JSON format
+        document.getElementById('upload-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file').files[0]);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const logOutput = document.getElementById('log-output');
+                logOutput.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
