@@ -1,84 +1,106 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, render_template, request, jsonify
 import polars as pl
 import re
 
 app = Flask(__name__)
 
-# Default Age Rating ID
-DEFAULT_AGE_RATING = 147  # Default Age Rating if no keyword matches
+# Sample content descriptors for age rating and their corresponding IDs
+content_descriptors = {
+    "General": {"age_rating_id": 2},
+    "Very mild": {"age_rating_id": 2},
+    "Mild": {"age_rating_id": 9},
+    "Strong": {"age_rating_id": 156},
+    "High impact": {"age_rating_id": 154}
+}
+
+# Default age rating ID if no prefix is found
+default_age_rating_id = 147
+
+# Function to process the CSV file and return logs
+def process_file(file):
+    logs = []
+    try:
+        # Read the CSV file with Polars
+        df = pl.read_csv(file)
+
+        # Process the data
+        for row_index, row in df.iter_rows(named=True):
+            row_log = {}
+
+            # Check for blanks and log
+            for col_name, value in row.items():
+                if value == '' or value is None:
+                    logs.append({
+                        "line": row_index + 1,
+                        "column": col_name,
+                        "message": "Blank value found"
+                    })
+
+            # Age rating logic
+            age_rating_column = "Age rating"  # Replace with actual column name
+            if age_rating_column in row:
+                age_rating = row[age_rating_column]
+                if isinstance(age_rating, str):
+                    matched = False
+                    for keyword, desc in content_descriptors.items():
+                        if keyword.lower() in age_rating.lower():
+                            row[age_rating_column] = desc["age_rating_id"]  # Set Age rating ID
+                            logs.append({
+                                "line": row_index + 1,
+                                "column": age_rating_column,
+                                "old": age_rating,
+                                "new": desc["age_rating_id"],
+                                "reason": f"CDs Found - Content Descriptor: {keyword}"
+                            })
+                            matched = True
+                            break
+                    if not matched:
+                        row[age_rating_column] = default_age_rating_id
+                        logs.append({
+                            "line": row_index + 1,
+                            "column": age_rating_column,
+                            "old": age_rating,
+                            "new": default_age_rating_id,
+                            "reason": "No relevant descriptor found"
+                        })
+
+            # Removing invalid characters from the "Other title names" column
+            other_title_column = "Other title names"  # Replace with actual column name
+            if other_title_column in row:
+                original_title = row[other_title_column]
+                if isinstance(original_title, str):
+                    # Removing Japanese, Chinese, Russian characters
+                    cleaned_title = re.sub(r'[^\x00-\x7F]+', '', original_title)
+                    if cleaned_title != original_title:
+                        row[other_title_column] = cleaned_title
+                        logs.append({
+                            "line": row_index + 1,
+                            "column": other_title_column,
+                            "old": original_title,
+                            "new": cleaned_title,
+                            "message": "Removed invalid characters (Japanese, Chinese, Russian)"
+                        })
+
+        return logs
+    except Exception as e:
+        return [{"error": str(e)}]
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
-def upload_file():
-    # Handle file upload
+def upload():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+
     file = request.files['file']
-    df = pl.read_csv(file)
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
 
-    logs = []  # Collect logs here
+    if file:
+        logs = process_file(file)
+        return jsonify(logs)
 
-    # Check for blanks in the dataframe
-    for col in df.columns:
-        null_rows = df.filter(df[col].is_null()).to_dicts()
-        for row in null_rows:
-            logs.append({
-                "line": row.get("line", "unknown"),
-                "column": col,
-                "issue": "Blank value found"
-            })
-
-    # Update Age rating based on the "Content Descriptor" column
-    if "Age rating" in df.columns and "Content Descriptor" in df.columns:
-        for idx, (age, descriptor) in enumerate(zip(df["Age rating"], df["Content Descriptor"])):
-            new_age = DEFAULT_AGE_RATING  # Default age rating if no content descriptor matches
-            reason = f"Content Descriptor value: {descriptor}"  # Default reason to the content descriptor
-
-            if descriptor:  # Ensure the descriptor is not empty
-                # Logic for determining the new age rating based on Content Descriptor
-                if "general" in descriptor.lower() or "very mild" in descriptor.lower():
-                    new_age = 2
-                elif "mild" in descriptor.lower():
-                    new_age = 9
-                elif "strong" in descriptor.lower():
-                    new_age = 156
-                elif "high impact" in descriptor.lower():
-                    new_age = 154
-                else:
-                    new_age = DEFAULT_AGE_RATING  # If no match, keep the default age rating
-
-            # If the age rating has changed, log the change
-            if age != new_age:  # Log changes only if there is a modification
-                logs.append({
-                    "line": idx + 1,
-                    "column": "Age rating",
-                    "old": age,
-                    "new": new_age,
-                    "reason": reason
-                })
-                df[idx, "Age rating"] = new_age
-
-    # Remove invalid characters (Japanese, Chinese, Russian) from "Other title names"
-    if "Other title names" in df.columns:
-        def clean_invalid_chars(text):
-            cleaned_text = re.sub(r'[\u4E00-\u9FFF\u3040-\u30FF\u0400-\u04FF]', '', text)
-            removed = ''.join(set(text) - set(cleaned_text))
-            return cleaned_text, removed
-
-        for idx, value in enumerate(df["Other title names"]):
-            if isinstance(value, str):
-                cleaned_value, removed_chars = clean_invalid_chars(value)
-                if removed_chars:
-                    logs.append({
-                        "line": idx + 1,
-                        "column": "Other title names",
-                        "removed": removed_chars
-                    })
-                df[idx, "Other title names"] = cleaned_value
-
-    # Return logs in JSON format
-    return jsonify(logs)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
